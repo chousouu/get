@@ -1,64 +1,44 @@
-import matplotlib.pyplot as plt
-import numpy as np
+import matplotlib.pyplot as mplot
+import numpy             as npy
 
 
-def cvt_to_volt(data):
-    for i in range(0, len(data)):
-        data[i] = 3.3 * data[i] / 255 
+bdepth    = 8
+vref      = 3.3
+n_markers = 100
 
-    return data
+# getting info from here
 
-def read_data(path_to_data: str):
-    with open(path_to_data, "r") as file_:
-        data_str = file_.read().split()
-        data = np.array(list(map(float, data_str)))
+settings = npy.loadtxt( "/home/b01-103/Desktop/Scripts/settings.txt", dtype = float )
+d_data   = npy.loadtxt( "/home/b01-103/Desktop/Scripts/data.txt"    , dtype = int   ) # digital data (0-255)
 
-    return data
+#work with the data
 
-def count_time(data: np.ndarray, freq: float, total_time: float):
-    charging_time = data.argmax() * freq
-    discharging_time = total_time - charging_time
+samplerate   = settings[0]
+quantization = settings[1]
+size         = d_data.size / 5
+a_data       = d_data / ( 2 ** bdepth ) * vref # analog data (0V - Vref V)
+period       = 1 / samplerate
+maxtime      = period * d_data.size *0.001
+datatime     = npy.linspace( 0, maxtime , num = d_data.size )
+chargetime   = d_data.argmax() * period *0.001
+unchargetime = (max( datatime ) - chargetime)
 
-    return charging_time, discharging_time
+# the graph part
 
-
-def plot_data(path_to_data: str, path_to_stat: str, figsize=(18, 12), markerevery=250, markerstyle="o", color="red",
-              save_graph = False, save_name = None):
-    
-    raw_data = read_data(path_to_data)
-    data = cvt_to_volt(raw_data)
-    stat = read_data(path_to_stat)
-    total_time = stat[3]
-    freqs      = stat[0]
-
-    Y_values = data
-    X_values = np.arange(start=freqs, stop=total_time, step=freqs)
-    charg_time, discharg_time = count_time (data, freqs, total_time)
-    fig, ax = plt.subplots(figsize=figsize, dpi=140)
-    ax.minorticks_on()
-    ax.set(xlim=(0, 90), ylim=(0, 3.3))
-    plt.plot(X_values, Y_values, marker=markerstyle, markevery=markerevery, label="V(t)", color=color, )
-    plt.text(0.82 * X_values.max(), 0.8 * Y_values.max(), 
-            f"Total time is: {total_time:.2f} secs\n"
-            f"Charging time is: {charg_time:.2f}\n"
-            f"Discharging time is: {discharg_time:.2f}\n")
-
-    plt.xlabel("Time, s")
-    plt.ylabel("Voltage, V")
-    plt.title("Proccess of capacitor's charging in RC-circut")
-    plt.grid(which="major", linestyle="-", linewidth=1)
-    plt.grid(which="minor", linestyle="--", linewidth=0.5)
-    plt.legend()
-
-    if save_graph and save_name is not None:
-        plt.savefig(save_name)
-
-    plt.show()
-
-
-path_to_data = "./data.txt"
-path_to_stat = "./settings.txt"
-
-plot_data(path_to_data, path_to_stat, save_graph=True, color="blue", save_name="./plot.svg")
-
-
+fig, ax = mplot.subplots( figsize = (16, 10), dpi = 200 ) # layout = "constrained"
+ax.set_title( "Процесс зарядки-разрядки конденсатора", wrap = True )
+ax.set_xlabel( "t, s" )
+ax.set_ylabel( "U, V" )
+ax.set_xlim( 0, maxtime )
+ax.set_ylim( 0, max( a_data ) * 1.1 )
+ax.text( chargetime + maxtime / 15, 0.8 * max( a_data ), f"Время заряда: {chargetime:.1f} с\n\nВремя разряда: {unchargetime:.1f} с", fontsize = 20, color = "blue" )
+ax.minorticks_on()
+ax.grid( True )
+ax.grid( True, "minor", ls = ":" )
+# ax.xaxis.set_major_locator( NullLocator )
+markrate = int( size / n_markers )
+ax.plot( datatime, a_data, marker = 'o', markersize = 5, markeredgecolor = "red", markevery = markrate, color = "blue", alpha = 1, linewidth = 0.2, linestyle = "--", label = "V=V(t)" )
+ax.legend()
+fig.savefig( "/home/b01-103/Desktop/Scripts/graph.png" )
+fig.savefig( "/home/b01-103/Desktop/Scripts/graph.svg" )
+# mplot.show()
